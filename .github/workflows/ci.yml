@@ -13,15 +13,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Setup MoonBit
-        uses: moonbitlang/setup-moon@v1
-        with:
-          version: latest
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
 
       - name: Check
-        run: moon check
+        run: ~/.moon/bin/moon check
 
       - name: Test
-        run: moon test
+        run: ~/.moon/bin/moon test
 
       - name: Format check
-        run: moon fmt --check
+        run: ~/.moon/bin/moon fmt --check
