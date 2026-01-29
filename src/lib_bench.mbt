@@ -130,8 +130,36 @@ test "bench: Dependency tracking" (b : @bench.T) {
   b.bench(name="Record 100 dependencies", fn() {
     rt.push_query(0, 0)
     for i in 0..<100 {
-      rt.record_dependency(i, i, Revision::new(i)) |> ignore
+      rt.record_dependency(i, i, Revision::new(i), Durability::Low) |> ignore
     }
     rt.pop_query() |> ignore
+  })
+}
+
+///|
+/// Benchmark: Durability optimization
+test "bench: Durability" (b : @bench.T) {
+  let rt = Runtime::new()
+  // High durability input (rarely changes)
+  let stdlib : Input[Int, Int] = Input::new_with_durability(0, Durability::High)
+  // Low durability input (frequently changes)
+  let user_file : Input[Int, Int] = Input::new_with_durability(
+    1,
+    Durability::Low,
+  )
+  // Query depends on high durability input only
+  let stdlib_query : Query[Int, Int] = Query::new(2, fn(rt, key) {
+    stdlib.get(rt, key).unwrap_or(0) * 2
+  })
+  // Set high durability input once
+  stdlib.set(rt, 0, 100) |> ignore
+  stdlib_query.fetch(rt, 0) |> ignore
+  b.bench(name="High durability skip (100 low changes)", fn() {
+    for i in 0..<100 {
+      // Only change low durability input
+      user_file.set(rt, 0, i) |> ignore
+      // Query should skip recompute (depends only on high durability)
+      stdlib_query.fetch(rt, 0) |> ignore
+    }
   })
 }

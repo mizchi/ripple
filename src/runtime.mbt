@@ -8,6 +8,8 @@ pub struct QueryEdge {
   key_index : Int
   /// The revision at which the dependency was recorded (changed_at of the accessed value)
   changed_at : Revision
+  /// Durability of the dependency
+  durability : Durability
 } derive(Eq, Show)
 
 ///|
@@ -22,12 +24,20 @@ struct ActiveQuery {
   edges : Array[QueryEdge]
   /// Maximum changed_at among all dependencies
   mut changed_at : Revision
+  /// Minimum durability among all dependencies
+  mut durability : Durability
 }
 
 ///|
 /// Create a new ActiveQuery.
 pub fn ActiveQuery::new(ingredient_index : Int, key_index : Int) -> ActiveQuery {
-  { ingredient_index, key_index, edges: [], changed_at: Revision::zero() }
+  {
+    ingredient_index,
+    key_index,
+    edges: [],
+    changed_at: Revision::zero(),
+    durability: Durability::High,
+  }
 }
 
 ///|
@@ -37,9 +47,11 @@ pub fn ActiveQuery::add_edge(
   ingredient_index : Int,
   key_index : Int,
   changed_at : Revision,
+  durability : Durability,
 ) -> Unit {
-  self.edges.push({ ingredient_index, key_index, changed_at })
+  self.edges.push({ ingredient_index, key_index, changed_at, durability })
   self.changed_at = self.changed_at.max(changed_at)
+  self.durability = self.durability.min(durability)
 }
 
 ///|
@@ -55,18 +67,31 @@ pub fn ActiveQuery::get_changed_at(self : ActiveQuery) -> Revision {
 }
 
 ///|
+/// Get the minimum durability among all dependencies.
+pub fn ActiveQuery::get_durability(self : ActiveQuery) -> Durability {
+  self.durability
+}
+
+///|
 /// Runtime manages the global state of the incremental computation system.
 struct Runtime {
   /// Current revision counter
   mut current_revision : Revision
   /// Stack of currently executing queries (for dependency tracking)
   query_stack : Array[ActiveQuery]
+  /// Last changed revision for each durability level
+  /// Index 0 = Low, 1 = Medium, 2 = High
+  durability_revisions : FixedArray[Revision]
 }
 
 ///|
 /// Create a new Runtime.
 pub fn Runtime::new() -> Runtime {
-  { current_revision: Revision::new(1), query_stack: [] }
+  {
+    current_revision: Revision::new(1),
+    query_stack: [],
+    durability_revisions: [Revision::zero(), Revision::zero(), Revision::zero()],
+  }
 }
 
 ///|
@@ -77,9 +102,27 @@ pub fn Runtime::current_revision(self : Runtime) -> Revision {
 
 ///|
 /// Increment the revision (called when an input changes).
-pub fn Runtime::increment_revision(self : Runtime) -> Revision {
+/// Updates the durability revision for the given durability level.
+pub fn Runtime::increment_revision(
+  self : Runtime,
+  durability : Durability,
+) -> Revision {
   self.current_revision = self.current_revision.next()
+  // Update durability revision for this level and all lower levels
+  let index = durability.to_index()
+  for i = 0; i <= index; i = i + 1 {
+    self.durability_revisions[i] = self.current_revision
+  }
   self.current_revision
+}
+
+///|
+/// Get the last changed revision for a durability level.
+pub fn Runtime::last_changed_at(
+  self : Runtime,
+  durability : Durability,
+) -> Revision {
+  self.durability_revisions[durability.to_index()]
 }
 
 ///|
@@ -93,10 +136,12 @@ pub fn Runtime::push_query(
 }
 
 ///|
-/// Pop the active query from the stack and return its recorded edges.
-pub fn Runtime::pop_query(self : Runtime) -> (Array[QueryEdge], Revision)? {
+/// Pop the active query from the stack and return its recorded edges, changed_at, and durability.
+pub fn Runtime::pop_query(
+  self : Runtime,
+) -> (Array[QueryEdge], Revision, Durability)? {
   match self.query_stack.pop() {
-    Some(q) => Some((q.get_edges(), q.get_changed_at()))
+    Some(q) => Some((q.get_edges(), q.get_changed_at(), q.get_durability()))
     None => None
   }
 }
@@ -109,10 +154,11 @@ pub fn Runtime::record_dependency(
   ingredient_index : Int,
   key_index : Int,
   changed_at : Revision,
+  durability : Durability,
 ) -> Bool {
   match self.query_stack.last() {
     Some(q) => {
-      q.add_edge(ingredient_index, key_index, changed_at)
+      q.add_edge(ingredient_index, key_index, changed_at, durability)
       true
     }
     None => false

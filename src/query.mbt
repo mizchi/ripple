@@ -2,10 +2,12 @@
 /// Memo stores a cached query result with its revision metadata.
 struct Memo[V] {
   value : V
-  /// Revision when this value was last computed
-  verified_at : Revision
+  /// Revision when this value was last computed/verified
+  mut verified_at : Revision
   /// Revision when this value actually changed
   changed_at : Revision
+  /// Minimum durability among all dependencies
+  durability : Durability
   /// Dependencies recorded during computation (for future deep verify)
   _edges : Array[QueryEdge]
 }
@@ -57,18 +59,44 @@ pub fn[K : Hash + Eq, V : Eq] Query::fetch(
       if memo.verified_at == rt.current_revision() {
         // Record dependency only if there's an active parent query
         if rt.has_active_query() {
-          rt.record_dependency(self.ingredient_index, key_hash, memo.changed_at)
+          rt.record_dependency(
+            self.ingredient_index,
+            key_hash,
+            memo.changed_at,
+            memo.durability,
+          )
           |> ignore
         }
         return memo.value
       }
-      // Need to recompute or deep verify
-      // For Phase 1, we just recompute
+      // Durability-based shallow verify:
+      // If only high-durability inputs changed since last verify,
+      // and this query only depends on higher durability, skip deep verify
+      let last_changed = rt.last_changed_at(memo.durability)
+      if not(last_changed.is_after(memo.verified_at)) {
+        // No changes at this durability level - cache is valid
+        memo.verified_at = rt.current_revision()
+        if rt.has_active_query() {
+          rt.record_dependency(
+            self.ingredient_index,
+            key_hash,
+            memo.changed_at,
+            memo.durability,
+          )
+          |> ignore
+        }
+        return memo.value
+      }
+      // Need to recompute
       let new_value = self.execute(rt, key, key_hash)
-      // Backdate optimization: if value unchanged, keep old changed_at
       if rt.has_active_query() {
         let memo = self.memos.get(key).unwrap()
-        rt.record_dependency(self.ingredient_index, key_hash, memo.changed_at)
+        rt.record_dependency(
+          self.ingredient_index,
+          key_hash,
+          memo.changed_at,
+          memo.durability,
+        )
         |> ignore
       }
       new_value
@@ -78,7 +106,12 @@ pub fn[K : Hash + Eq, V : Eq] Query::fetch(
       let value = self.execute(rt, key, key_hash)
       if rt.has_active_query() {
         let memo = self.memos.get(key).unwrap()
-        rt.record_dependency(self.ingredient_index, key_hash, memo.changed_at)
+        rt.record_dependency(
+          self.ingredient_index,
+          key_hash,
+          memo.changed_at,
+          memo.durability,
+        )
         |> ignore
       }
       value
@@ -98,9 +131,9 @@ fn[K : Hash + Eq, V : Eq] Query::execute(
   rt.push_query(self.ingredient_index, key_hash)
   // Execute computation
   let value = (self.compute)(rt, key)
-  // Pop and get edges
-  let (edges, _deps_changed_at) = rt.pop_query().unwrap()
-  // Check if we have an old memo to compare against
+  // Pop and get edges, changed_at, and durability
+  let (edges, _deps_changed_at, durability) = rt.pop_query().unwrap()
+  // Check if we have an old memo to compare against (backdate)
   let old_changed_at = match self.memos.get(key) {
     Some(old_memo) =>
       if old_memo.value == value {
@@ -119,6 +152,7 @@ fn[K : Hash + Eq, V : Eq] Query::execute(
     value,
     verified_at: rt.current_revision(),
     changed_at: old_changed_at,
+    durability,
     _edges: edges,
   }
   self.memos.set(key, memo)
@@ -133,6 +167,18 @@ pub fn[K : Hash + Eq, V] Query::changed_at(
 ) -> Revision? {
   match self.memos.get(key) {
     Some(memo) => Some(memo.changed_at)
+    None => None
+  }
+}
+
+///|
+/// Get the durability for a key.
+pub fn[K : Hash + Eq, V] Query::get_durability(
+  self : Query[K, V],
+  key : K,
+) -> Durability? {
+  match self.memos.get(key) {
+    Some(memo) => Some(memo.durability)
     None => None
   }
 }

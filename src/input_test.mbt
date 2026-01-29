@@ -104,7 +104,7 @@ test "Input::get records dependency" {
   input.get(rt, "a") |> ignore
   // Pop and check edges
   match rt.pop_query() {
-    Some((edges, _)) => {
+    Some((edges, _, _)) => {
       inspect(edges.length(), content="1")
       inspect(edges[0].ingredient_index, content="0") // Input's index
       inspect(edges[0].changed_at.get(), content="2")

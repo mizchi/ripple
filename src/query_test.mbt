@@ -88,7 +88,7 @@ test "Query records dependencies" {
   inspect(result, content="3")
   // Check outer query recorded dependency on q
   match rt.pop_query() {
-    Some((edges, _)) => {
+    Some((edges, _, _)) => {
       inspect(edges.length(), content="1")
       inspect(edges[0].ingredient_index, content="1") // Query's index
     }

@@ -11,20 +11,37 @@ struct InputValue[V] {
 pub struct Input[K, V] {
   /// Unique index for this input
   ingredient_index : Int
+  /// Durability of this input (how often it changes)
+  durability : Durability
   /// Stored values
   values : @hashmap.HashMap[K, InputValue[V]]
 }
 
 ///|
-/// Create a new Input with the given ingredient index.
+/// Create a new Input with the given ingredient index and default Low durability.
 pub fn[K, V] Input::new(ingredient_index : Int) -> Input[K, V] {
-  { ingredient_index, values: @hashmap.new() }
+  { ingredient_index, durability: Durability::Low, values: @hashmap.new() }
+}
+
+///|
+/// Create a new Input with the given ingredient index and durability.
+pub fn[K, V] Input::new_with_durability(
+  ingredient_index : Int,
+  durability : Durability,
+) -> Input[K, V] {
+  { ingredient_index, durability, values: @hashmap.new() }
 }
 
 ///|
 /// Get the ingredient index.
 pub fn[K, V] Input::get_index(self : Input[K, V]) -> Int {
   self.ingredient_index
+}
+
+///|
+/// Get the durability of this input.
+pub fn[K, V] Input::get_durability(self : Input[K, V]) -> Durability {
+  self.durability
 }
 
 ///|
@@ -45,8 +62,8 @@ pub fn[K : Hash + Eq, V : Eq] Input::set(
       }
     None => ()
   }
-  // Value changed, increment revision
-  let new_revision = rt.increment_revision()
+  // Value changed, increment revision with durability
+  let new_revision = rt.increment_revision(self.durability)
   self.values.set(key, { value, changed_at: new_revision })
   new_revision
 }
@@ -60,9 +77,14 @@ pub fn[K : Hash + Eq, V] Input::get(
 ) -> V? {
   match self.values.get(key) {
     Some(entry) => {
-      // Record dependency for the active query
+      // Record dependency for the active query with durability
       let key_hash = key.hash()
-      rt.record_dependency(self.ingredient_index, key_hash, entry.changed_at)
+      rt.record_dependency(
+        self.ingredient_index,
+        key_hash,
+        entry.changed_at,
+        self.durability,
+      )
       |> ignore
       Some(entry.value)
     }

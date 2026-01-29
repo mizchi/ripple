@@ -21,11 +21,22 @@ pub fn Database::current_revision(self : Database) -> Revision {
 }
 
 ///|
-/// Create a new Input registered with this database.
+/// Create a new Input registered with this database (default Low durability).
 pub fn[K, V] Database::input(self : Database) -> Input[K, V] {
   let index = self.next_index
   self.next_index = self.next_index + 1
   Input::new(index)
+}
+
+///|
+/// Create a new Input with specified durability.
+pub fn[K, V] Database::input_with_durability(
+  self : Database,
+  durability : Durability,
+) -> Input[K, V] {
+  let index = self.next_index
+  self.next_index = self.next_index + 1
+  Input::new_with_durability(index, durability)
 }
 
 ///|

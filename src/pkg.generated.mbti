@@ -6,13 +6,15 @@ import {
 }
 
 // Values
+pub let durability_count : Int
 
 // Errors
 
 // Types and methods
 type ActiveQuery
-pub fn ActiveQuery::add_edge(Self, Int, Int, Revision) -> Unit
+pub fn ActiveQuery::add_edge(Self, Int, Int, Revision, Durability) -> Unit
 pub fn ActiveQuery::get_changed_at(Self) -> Revision
+pub fn ActiveQuery::get_durability(Self) -> Durability
 pub fn ActiveQuery::get_edges(Self) -> Array[QueryEdge]
 pub fn ActiveQuery::new(Int, Int) -> Self
 
@@ -22,20 +24,36 @@ pub struct Database {
 }
 pub fn Database::current_revision(Self) -> Revision
 pub fn[K, V] Database::input(Self) -> Input[K, V]
+pub fn[K, V] Database::input_with_durability(Self, Durability) -> Input[K, V]
 pub fn Database::new() -> Self
 pub fn[K, V] Database::query(Self, (Runtime, K) -> V) -> Query[K, V]
 pub fn Database::runtime(Self) -> Runtime
 
+pub(all) enum Durability {
+  Low
+  Medium
+  High
+}
+pub fn Durability::min(Self, Self) -> Self
+pub fn Durability::to_index(Self) -> Int
+pub impl Compare for Durability
+pub impl Eq for Durability
+pub impl Hash for Durability
+pub impl Show for Durability
+
 pub struct Input[K, V] {
   ingredient_index : Int
+  durability : Durability
   values : @hashmap.HashMap[K, InputValue[V]]
 }
 pub fn[K : Hash + Eq, V] Input::changed_at(Self[K, V], K) -> Revision?
 pub fn[K : Hash + Eq, V] Input::contains(Self[K, V], K) -> Bool
 pub fn[K : Hash + Eq, V] Input::get(Self[K, V], Runtime, K) -> V?
+pub fn[K, V] Input::get_durability(Self[K, V]) -> Durability
 pub fn[K, V] Input::get_index(Self[K, V]) -> Int
 pub fn[K : Hash + Eq, V] Input::maybe_changed_after(Self[K, V], K, Revision) -> Bool
 pub fn[K, V] Input::new(Int) -> Self[K, V]
+pub fn[K, V] Input::new_with_durability(Int, Durability) -> Self[K, V]
 pub fn[K : Hash + Eq, V : Eq] Input::set(Self[K, V], Runtime, K, V) -> Revision
 
 type InputValue[V]
@@ -49,6 +67,7 @@ pub struct Query[K, V] {
 }
 pub fn[K : Hash + Eq, V] Query::changed_at(Self[K, V], K) -> Revision?
 pub fn[K : Hash + Eq, V : Eq] Query::fetch(Self[K, V], Runtime, K) -> V
+pub fn[K : Hash + Eq, V] Query::get_durability(Self[K, V], K) -> Durability?
 pub fn[K, V] Query::get_index(Self[K, V]) -> Int
 pub fn[K : Hash + Eq, V] Query::maybe_changed_after(Self[K, V], K, Revision) -> Bool
 pub fn[K, V] Query::new(Int, (Runtime, K) -> V) -> Self[K, V]
@@ -57,6 +76,7 @@ pub struct QueryEdge {
   ingredient_index : Int
   key_index : Int
   changed_at : Revision
+  durability : Durability
 }
 pub impl Eq for QueryEdge
 pub impl Show for QueryEdge
@@ -79,12 +99,13 @@ pub impl Show for Revision
 type Runtime
 pub fn Runtime::current_revision(Self) -> Revision
 pub fn Runtime::has_active_query(Self) -> Bool
-pub fn Runtime::increment_revision(Self) -> Revision
+pub fn Runtime::increment_revision(Self, Durability) -> Revision
 pub fn Runtime::is_executing(Self, Int, Int) -> Bool
+pub fn Runtime::last_changed_at(Self, Durability) -> Revision
 pub fn Runtime::new() -> Self
-pub fn Runtime::pop_query(Self) -> (Array[QueryEdge], Revision)?
+pub fn Runtime::pop_query(Self) -> (Array[QueryEdge], Revision, Durability)?
 pub fn Runtime::push_query(Self, Int, Int) -> Unit
-pub fn Runtime::record_dependency(Self, Int, Int, Revision) -> Bool
+pub fn Runtime::record_dependency(Self, Int, Int, Revision, Durability) -> Bool
 
 // Type aliases
 
