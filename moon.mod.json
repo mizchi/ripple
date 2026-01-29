@@ -1,0 +1,12 @@
+{
+  "name": "mizchi/incr",
+  "version": "0.1.0",
+  "deps": {},
+  "source": "src",
+  "preferred-target": "js",
+  "readme": "README.mbt.md",
+  "repository": "https://github.com/mizchi/incr",
+  "license": "MIT",
+  "keywords": ["incremental", "memoization", "cache"],
+  "description": "Incremental computation library for MoonBit"
+}

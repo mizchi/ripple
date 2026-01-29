@@ -1,0 +1,102 @@
+///|
+/// InputValue stores a value along with its revision metadata.
+struct InputValue[V] {
+  value : V
+  changed_at : Revision
+}
+
+///|
+/// Input represents an external input to the incremental computation system.
+/// Values can be set at any time, which increments the revision.
+pub struct Input[K, V] {
+  /// Unique index for this input
+  ingredient_index : Int
+  /// Stored values
+  values : @hashmap.HashMap[K, InputValue[V]]
+}
+
+///|
+/// Create a new Input with the given ingredient index.
+pub fn[K, V] Input::new(ingredient_index : Int) -> Input[K, V] {
+  { ingredient_index, values: @hashmap.new() }
+}
+
+///|
+/// Get the ingredient index.
+pub fn[K, V] Input::get_index(self : Input[K, V]) -> Int {
+  self.ingredient_index
+}
+
+///|
+/// Set a value in the input. Returns the new revision.
+/// If the value hasn't changed, no revision bump occurs.
+pub fn[K : Hash + Eq, V : Eq] Input::set(
+  self : Input[K, V],
+  rt : Runtime,
+  key : K,
+  value : V,
+) -> Revision {
+  // Check if value actually changed
+  match self.values.get(key) {
+    Some(existing) =>
+      if existing.value == value {
+        // No change, return current revision
+        return rt.current_revision()
+      }
+    None => ()
+  }
+  // Value changed, increment revision
+  let new_revision = rt.increment_revision()
+  self.values.set(key, { value, changed_at: new_revision })
+  new_revision
+}
+
+///|
+/// Get a value from the input. Records a dependency if there's an active query.
+pub fn[K : Hash + Eq, V] Input::get(
+  self : Input[K, V],
+  rt : Runtime,
+  key : K,
+) -> V? {
+  match self.values.get(key) {
+    Some(entry) => {
+      // Record dependency for the active query
+      let key_hash = key.hash()
+      rt.record_dependency(self.ingredient_index, key_hash, entry.changed_at)
+      |> ignore
+      Some(entry.value)
+    }
+    None => None
+  }
+}
+
+///|
+/// Check if a key exists in the input.
+pub fn[K : Hash + Eq, V] Input::contains(self : Input[K, V], key : K) -> Bool {
+  self.values.contains(key)
+}
+
+///|
+/// Get the changed_at revision for a key.
+pub fn[K : Hash + Eq, V] Input::changed_at(
+  self : Input[K, V],
+  key : K,
+) -> Revision? {
+  match self.values.get(key) {
+    Some(entry) => Some(entry.changed_at)
+    None => None
+  }
+}
+
+///|
+/// Check if the input might have changed after a given revision.
+pub fn[K : Hash + Eq, V] Input::maybe_changed_after(
+  self : Input[K, V],
+  key : K,
+  revision : Revision,
+) -> Bool {
+  match self.values.get(key) {
+    Some(entry) => entry.changed_at.is_after(revision)
+    None => true // Missing key is considered "changed"
+  }
+}
