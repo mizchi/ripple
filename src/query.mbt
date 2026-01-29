@@ -55,26 +55,32 @@ pub fn[K : Hash + Eq, V : Eq] Query::fetch(
     Some(memo) => {
       // Shallow verify: already verified at current revision?
       if memo.verified_at == rt.current_revision() {
-        // Record dependency and return cached value
-        rt.record_dependency(self.ingredient_index, key_hash, memo.changed_at)
-        |> ignore
+        // Record dependency only if there's an active parent query
+        if rt.has_active_query() {
+          rt.record_dependency(self.ingredient_index, key_hash, memo.changed_at)
+          |> ignore
+        }
         return memo.value
       }
       // Need to recompute or deep verify
       // For Phase 1, we just recompute
       let new_value = self.execute(rt, key, key_hash)
       // Backdate optimization: if value unchanged, keep old changed_at
-      let memo = self.memos.get(key).unwrap()
-      rt.record_dependency(self.ingredient_index, key_hash, memo.changed_at)
-      |> ignore
+      if rt.has_active_query() {
+        let memo = self.memos.get(key).unwrap()
+        rt.record_dependency(self.ingredient_index, key_hash, memo.changed_at)
+        |> ignore
+      }
       new_value
     }
     None => {
       // No cached value, compute fresh
       let value = self.execute(rt, key, key_hash)
-      let memo = self.memos.get(key).unwrap()
-      rt.record_dependency(self.ingredient_index, key_hash, memo.changed_at)
-      |> ignore
+      if rt.has_active_query() {
+        let memo = self.memos.get(key).unwrap()
+        rt.record_dependency(self.ingredient_index, key_hash, memo.changed_at)
+        |> ignore
+      }
       value
     }
   }

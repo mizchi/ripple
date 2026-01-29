@@ -61,8 +61,10 @@ pub struct QueryEdge {
 pub impl Eq for QueryEdge
 pub impl Show for QueryEdge
 
-type Revision
+pub struct Revision(Int)
 pub fn Revision::get(Self) -> Int
+#deprecated
+pub fn Revision::inner(Self) -> Int
 pub fn Revision::is_after(Self, Self) -> Bool
 pub fn Revision::is_at_or_after(Self, Self) -> Bool
 pub fn Revision::max(Self, Self) -> Self
@@ -71,6 +73,7 @@ pub fn Revision::next(Self) -> Self
 pub fn Revision::zero() -> Self
 pub impl Compare for Revision
 pub impl Eq for Revision
+pub impl Hash for Revision
 pub impl Show for Revision
 
 type Runtime
