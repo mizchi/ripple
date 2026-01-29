@@ -15,12 +15,19 @@ pub struct Input[K, V] {
   durability : Durability
   /// Stored values
   values : @hashmap.HashMap[K, InputValue[V]]
+  /// Hash to changed_at mapping for verifier lookup
+  hash_to_changed_at : @hashmap.HashMap[Int, Revision]
 }
 
 ///|
 /// Create a new Input with the given ingredient index and default Low durability.
 pub fn[K, V] Input::new(ingredient_index : Int) -> Input[K, V] {
-  { ingredient_index, durability: Durability::Low, values: @hashmap.new() }
+  {
+    ingredient_index,
+    durability: Durability::Low,
+    values: @hashmap.new(),
+    hash_to_changed_at: @hashmap.new(),
+  }
 }
 
 ///|
@@ -29,7 +36,28 @@ pub fn[K, V] Input::new_with_durability(
   ingredient_index : Int,
   durability : Durability,
 ) -> Input[K, V] {
-  { ingredient_index, durability, values: @hashmap.new() }
+  {
+    ingredient_index,
+    durability,
+    values: @hashmap.new(),
+    hash_to_changed_at: @hashmap.new(),
+  }
+}
+
+///|
+/// Register this input's verifier with the runtime.
+/// This enables deep verify for queries that depend on this input.
+pub fn[K, V] Input::register(self : Input[K, V], rt : Runtime) -> Unit {
+  // Create a verifier closure that captures the hash-to-revision mapping
+  // key_index is the hash of the key (as recorded in record_dependency)
+  let hash_to_changed_at = self.hash_to_changed_at
+  rt.register_verifier(self.ingredient_index, fn(key_index, revision) {
+    // Look up the specific key's changed_at by hash
+    match hash_to_changed_at.get(key_index) {
+      Some(changed_at) => changed_at.is_after(revision)
+      None => true // Key not found, consider it changed (conservative)
+    }
+  })
 }
 
 ///|
@@ -65,6 +93,8 @@ pub fn[K : Hash + Eq, V : Eq] Input::set(
   // Value changed, increment revision with durability
   let new_revision = rt.increment_revision(self.durability)
   self.values.set(key, { value, changed_at: new_revision })
+  // Update hash-to-changed_at mapping for verifier lookup
+  self.hash_to_changed_at.set(key.hash(), new_revision)
   new_revision
 }
 

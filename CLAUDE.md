@@ -1,6 +1,7 @@
-# incr - Incremental Computation Library for MoonBit
+# ripple - Incremental Computation Library for MoonBit
 
 A MoonBit implementation inspired by Rust's salsa framework.
+Changes ripple through the dependency graph, recomputing only what's necessary.
 
 ## Quick Commands
 
@@ -53,6 +54,9 @@ moon doc '@json'
 - **Input**: External input values (can be changed anytime)
 - **Query**: Tracked function (pure function, auto-memoized)
 - **Memo**: Cache entry with value, changed_at revision, and dependency edges
+- **CycleQuery**: Query with cycle detection and recovery
+- **Intern**: Value deduplication with stable IDs
+- **Accumulator**: Collect side-effect data during computation
 
 ### Key Types
 
@@ -60,6 +64,9 @@ moon doc '@json'
 - `Runtime` - Global state (current revision, query stack)
 - `Input[K, V]` - Input storage (key-value pairs)
 - `Query[K, V]` - Memoized query function
+- `CycleQuery[K, V]` - Query with cycle handling
+- `Intern[V]` - Interned value storage
+- `Accumulator[V]` - Side-effect collector
 - `Database` - Facade combining all components
 
 ## Before Commit

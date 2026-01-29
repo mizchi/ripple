@@ -1,12 +1,12 @@
 {
-  "name": "mizchi/incr",
+  "name": "mizchi/ripple",
   "version": "0.1.0",
   "deps": {},
   "source": "src",
   "preferred-target": "js",
   "readme": "README.mbt.md",
-  "repository": "https://github.com/mizchi/incr",
+  "repository": "https://github.com/mizchi/ripple",
   "license": "MIT",
-  "keywords": ["incremental", "memoization", "cache"],
-  "description": "Incremental computation library for MoonBit"
+  "keywords": ["incremental", "memoization", "cache", "dependency-tracking"],
+  "description": "Incremental computation library for MoonBit - changes ripple through the dependency graph"
 }

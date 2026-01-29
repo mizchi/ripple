@@ -8,8 +8,8 @@ struct Memo[V] {
   changed_at : Revision
   /// Minimum durability among all dependencies
   durability : Durability
-  /// Dependencies recorded during computation (for future deep verify)
-  _edges : Array[QueryEdge]
+  /// Dependencies recorded during computation (for deep verify)
+  edges : Array[QueryEdge]
 }
 
 ///|
@@ -37,6 +37,68 @@ pub fn[K, V] Query::new(
 /// Get the ingredient index.
 pub fn[K, V] Query::get_index(self : Query[K, V]) -> Int {
   self.ingredient_index
+}
+
+///|
+/// Register this query's verifier with the runtime.
+/// This enables deep verify for queries that depend on this query.
+/// Note: For Query, the verifier must ensure the memo is up-to-date
+/// before checking if it changed. This requires calling verify_internal.
+pub fn[K : Hash + Eq, V : Eq] Query::register(
+  self : Query[K, V],
+  rt : Runtime,
+) -> Unit {
+  // Create verifier that properly updates the memo before checking
+  // We need to capture self and rt to call verify_internal
+  let query = self
+  let runtime = rt
+  rt.register_verifier(self.ingredient_index, fn(key_index, revision) {
+    // First, ensure the memo is up to date by calling verify_internal
+    query.verify_by_hash(runtime, key_index)
+    // Then check if it changed
+    for entry in query.memos.iter() {
+      let (_, memo) = entry
+      if memo.changed_at.is_after(revision) {
+        return true
+      }
+    }
+    false
+  })
+}
+
+///|
+/// Verify a memo by key hash without recording dependencies.
+/// Used by the verifier to ensure memo is up to date.
+fn[K : Hash + Eq, V : Eq] Query::verify_by_hash(
+  self : Query[K, V],
+  rt : Runtime,
+  key_hash : Int,
+) -> Unit {
+  // Find the key with matching hash
+  for entry in self.memos.iter() {
+    let (key, memo) = entry
+    if key.hash() == key_hash {
+      // Verify this memo if needed
+      if memo.verified_at == rt.current_revision() {
+        return // Already verified
+      }
+      // Check durability-based shallow verify
+      let last_changed = rt.last_changed_at(memo.durability)
+      if not(last_changed.is_after(memo.verified_at)) {
+        memo.verified_at = rt.current_revision()
+        return // No changes at this durability level
+      }
+      // Deep verify: check dependencies
+      let deps_changed = self.deep_verify(rt, memo)
+      if not(deps_changed) {
+        memo.verified_at = rt.current_revision()
+        return // Dependencies unchanged
+      }
+      // Need to recompute - call execute
+      self.execute(rt, key, key_hash) |> ignore
+      return
+    }
+  }
 }
 
 ///|
@@ -87,7 +149,23 @@ pub fn[K : Hash + Eq, V : Eq] Query::fetch(
         }
         return memo.value
       }
-      // Need to recompute
+      // Deep verify: check if any dependency actually changed
+      let deps_changed = self.deep_verify(rt, memo)
+      if not(deps_changed) {
+        // No dependency changed - cache is still valid
+        memo.verified_at = rt.current_revision()
+        if rt.has_active_query() {
+          rt.record_dependency(
+            self.ingredient_index,
+            key_hash,
+            memo.changed_at,
+            memo.durability,
+          )
+          |> ignore
+        }
+        return memo.value
+      }
+      // Dependencies changed - need to recompute
       let new_value = self.execute(rt, key, key_hash)
       if rt.has_active_query() {
         let memo = self.memos.get(key).unwrap()
@@ -117,6 +195,27 @@ pub fn[K : Hash + Eq, V : Eq] Query::fetch(
       value
     }
   }
+}
+
+///|
+/// Deep verify: check if any dependency has changed since last verification.
+fn[K, V] Query::deep_verify(
+  self : Query[K, V],
+  rt : Runtime,
+  memo : Memo[V],
+) -> Bool {
+  ignore(self)
+  for edge in memo.edges {
+    // Check if this dependency's changed_at is after what we recorded
+    if rt.maybe_changed_after(
+        edge.ingredient_index,
+        edge.key_index,
+        edge.changed_at,
+      ) {
+      return true
+    }
+  }
+  false
 }
 
 ///|
@@ -153,7 +252,7 @@ fn[K : Hash + Eq, V : Eq] Query::execute(
     verified_at: rt.current_revision(),
     changed_at: old_changed_at,
     durability,
-    _edges: edges,
+    edges,
   }
   self.memos.set(key, memo)
   value

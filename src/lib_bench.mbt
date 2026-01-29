@@ -163,3 +163,105 @@ test "bench: Durability" (b : @bench.T) {
     }
   })
 }
+
+///|
+/// Benchmark: Deep verify with backdate optimization
+/// When intermediate query returns same value, downstream skips recompute
+test "bench: Deep verify backdate" (b : @bench.T) {
+  let rt = Runtime::new()
+  let input : Input[Int, Int] = Input::new(0)
+  input.register(rt)
+  // Query 1: returns constant (always backdates)
+  let q1 : Query[Int, Int] = Query::new(1, fn(rt, key) {
+    input.get(rt, key) |> ignore
+    42 // Always returns 42
+  })
+  q1.register(rt)
+  // Query 2: depends on q1
+  let q2 : Query[Int, Int] = Query::new(2, fn(rt, key) { q1.fetch(rt, key) * 2 })
+  // Warm up
+  input.set(rt, 0, 1) |> ignore
+  q2.fetch(rt, 0) |> ignore
+  b.bench(name="Deep verify backdate (100 changes)", fn() {
+    for i in 0..<100 {
+      input.set(rt, 0, i) |> ignore
+      // q1 recomputes, q2 should skip (deep verify + backdate)
+      q2.fetch(rt, 0) |> ignore
+    }
+  })
+}
+
+///|
+/// Benchmark: Deep verify chain propagation
+/// Three-level chain where abs() causes backdate on sign change
+test "bench: Deep verify chain" (b : @bench.T) {
+  let rt = Runtime::new()
+  let input : Input[Int, Int] = Input::new(0)
+  input.register(rt)
+  // q1: abs - backdates when sign changes
+  let q1 : Query[Int, Int] = Query::new(1, fn(rt, key) {
+    input.get(rt, key).unwrap_or(0).abs()
+  })
+  q1.register(rt)
+  // q2: depends on q1
+  let q2 : Query[Int, Int] = Query::new(2, fn(rt, key) {
+    q1.fetch(rt, key) * 10
+  })
+  q2.register(rt)
+  // q3: depends on q2
+  let q3 : Query[Int, Int] = Query::new(3, fn(rt, key) { q2.fetch(rt, key) + 1 })
+  // Warm up
+  input.set(rt, 0, 5) |> ignore
+  q3.fetch(rt, 0) |> ignore
+  b.bench(name="Deep verify chain (50 positive, 50 negative)", fn() {
+    for i in 0..<50 {
+      // Alternating between 5 and -5
+      input.set(rt, 0, if i % 2 == 0 { 5 } else { -5 }) |> ignore
+      q3.fetch(rt, 0) |> ignore
+    }
+  })
+}
+
+///|
+/// Benchmark: Intern new values
+test "bench: Intern new values" (b : @bench.T) {
+  let rt = Runtime::new()
+  let strings : Intern[String] = Intern::new(0)
+  b.bench(name="Intern 1000 unique strings", fn() {
+    for i in 0..<1000 {
+      strings.intern(rt, "string_" + i.to_string()) |> ignore
+    }
+  })
+}
+
+///|
+/// Benchmark: Intern lookup (existing values)
+test "bench: Intern lookup" (b : @bench.T) {
+  let rt = Runtime::new()
+  let strings : Intern[String] = Intern::new(0)
+  // Pre-populate
+  for i in 0..<1000 {
+    strings.intern(rt, "string_" + i.to_string()) |> ignore
+  }
+  b.bench(name="Intern lookup 1000 existing", fn() {
+    for i in 0..<1000 {
+      strings.intern(rt, "string_" + i.to_string()) |> ignore
+    }
+  })
+}
+
+///|
+/// Benchmark: Intern ID comparison
+test "bench: InternId comparison" (b : @bench.T) {
+  let rt = Runtime::new()
+  let strings : Intern[String] = Intern::new(0)
+  let id1 = strings.intern(rt, "hello")
+  let id2 = strings.intern(rt, "world")
+  b.bench(name="InternId comparison 10000", fn() {
+    for _ in 0..<10000 {
+      let _ = id1 == id2
+      ()
+    }
+    b.keep(id1)
+  })
+}

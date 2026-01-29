@@ -1,11 +1,34 @@
 // Generated using `moon info`, DON'T EDIT IT
-package "mizchi/incr/main"
+package "mizchi/ripple/main"
 
 // Values
+pub fn run_typelang_demo() -> Unit
 
 // Errors
 
 // Types and methods
+type CompiledObject
+pub impl Eq for CompiledObject
+pub impl Show for CompiledObject
+
+type Diagnostic
+pub impl Eq for Diagnostic
+pub impl Show for Diagnostic
+
+type Expr
+pub impl Eq for Expr
+pub impl Show for Expr
+
+type FileContent
+pub impl Eq for FileContent
+pub impl Hash for FileContent
+pub impl Show for FileContent
+
+type Ty
+pub impl Eq for Ty
+pub impl Show for Ty
+
+type TyEnv
 
 // Type aliases
 

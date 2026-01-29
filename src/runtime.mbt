@@ -73,6 +73,10 @@ pub fn ActiveQuery::get_durability(self : ActiveQuery) -> Durability {
 }
 
 ///|
+/// Verifier function type: (key_index, revision) -> maybe_changed
+priv struct Verifier((Int, Revision) -> Bool)
+
+///|
 /// Runtime manages the global state of the incremental computation system.
 struct Runtime {
   /// Current revision counter
@@ -82,6 +86,8 @@ struct Runtime {
   /// Last changed revision for each durability level
   /// Index 0 = Low, 1 = Medium, 2 = High
   durability_revisions : FixedArray[Revision]
+  /// Verifier registry: ingredient_index -> verifier function
+  verifiers : @hashmap.HashMap[Int, Verifier]
 }
 
 ///|
@@ -91,6 +97,32 @@ pub fn Runtime::new() -> Runtime {
     current_revision: Revision::new(1),
     query_stack: [],
     durability_revisions: [Revision::zero(), Revision::zero(), Revision::zero()],
+    verifiers: @hashmap.new(),
+  }
+}
+
+///|
+/// Register a verifier for an ingredient.
+pub fn Runtime::register_verifier(
+  self : Runtime,
+  ingredient_index : Int,
+  verifier : (Int, Revision) -> Bool,
+) -> Unit {
+  self.verifiers.set(ingredient_index, Verifier(verifier))
+}
+
+///|
+/// Check if an ingredient might have changed after a revision.
+/// Returns true if changed or if no verifier is registered.
+pub fn Runtime::maybe_changed_after(
+  self : Runtime,
+  ingredient_index : Int,
+  key_index : Int,
+  revision : Revision,
+) -> Bool {
+  match self.verifiers.get(ingredient_index) {
+    Some(Verifier(verifier)) => verifier(key_index, revision)
+    None => true // No verifier registered, assume changed
   }
 }
 
@@ -184,4 +216,14 @@ pub fn Runtime::is_executing(
     }
   }
   false
+}
+
+///|
+/// Get the currently executing query (top of the stack).
+/// Returns (ingredient_index, key_index) or None if no query is executing.
+pub fn Runtime::get_current_query(self : Runtime) -> (Int, Int)? {
+  match self.query_stack.last() {
+    Some(q) => Some((q.ingredient_index, q.key_index))
+    None => None
+  }
 }

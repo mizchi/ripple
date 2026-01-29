@@ -1,5 +1,6 @@
 import {
-  "mizchi/incr",
+  "mizchi/ripple",
+  "moonbitlang/core/hashmap",
 }
 
 options(

@@ -55,3 +55,65 @@ pub fn[K, V] Database::query(
 pub fn Database::runtime(self : Database) -> Runtime {
   self.runtime
 }
+
+///|
+/// Create a new Intern registered with this database (default High durability).
+pub fn[V] Database::intern(self : Database) -> Intern[V] {
+  let index = self.next_index
+  self.next_index = self.next_index + 1
+  Intern::new(index)
+}
+
+///|
+/// Create a new Intern with specified durability.
+pub fn[V] Database::intern_with_durability(
+  self : Database,
+  durability : Durability,
+) -> Intern[V] {
+  let index = self.next_index
+  self.next_index = self.next_index + 1
+  Intern::new_with_durability(index, durability)
+}
+
+///|
+/// Create a new CycleQuery with Panic strategy (same as regular Query).
+pub fn[K, V] Database::cycle_query(
+  self : Database,
+  compute : (Runtime, K) -> V,
+) -> CycleQuery[K, V] {
+  let index = self.next_index
+  self.next_index = self.next_index + 1
+  CycleQuery::new(index, compute)
+}
+
+///|
+/// Create a new CycleQuery with a fallback value for cycle recovery.
+pub fn[K, V] Database::cycle_query_with_fallback(
+  self : Database,
+  compute : (Runtime, K) -> V,
+  fallback : V,
+) -> CycleQuery[K, V] {
+  let index = self.next_index
+  self.next_index = self.next_index + 1
+  CycleQuery::new_with_fallback(index, compute, fallback)
+}
+
+///|
+/// Create a new CycleQuery with a recovery function for cycle recovery.
+pub fn[K, V] Database::cycle_query_with_recover(
+  self : Database,
+  compute : (Runtime, K) -> V,
+  recover : (Runtime, K) -> V,
+) -> CycleQuery[K, V] {
+  let index = self.next_index
+  self.next_index = self.next_index + 1
+  CycleQuery::new_with_recover(index, compute, recover)
+}
+
+///|
+/// Create a new Accumulator registered with this database.
+pub fn[V] Database::accumulator(self : Database) -> Accumulator[V] {
+  let index = self.next_index
+  self.next_index = self.next_index + 1
+  Accumulator::new(index)
+}

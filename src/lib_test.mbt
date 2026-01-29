@@ -201,3 +201,121 @@ test "Multiple inputs and queries" {
   let r3 = compute.fetch(rt, "a")
   inspect(r3, content="20")
 }
+
+///|
+/// Deep Verify Test: Downstream query should not recompute when
+/// intermediate query output doesn't change (backdate propagation)
+test "Deep verify with backdate: downstream query skips recompute" {
+  let db = Database::new()
+  let rt = db.runtime()
+  // Input that can change
+  let input : Input[Int, Int] = db.input()
+  input.register(rt) // Register verifier for deep verify
+  // Query 1: returns constant regardless of input (will backdate)
+  let mut q1_count = 0
+  let q1 : Query[Int, Int] = db.query(fn(rt, key) {
+    q1_count = q1_count + 1
+    input.get(rt, key) |> ignore // Read input (creates dependency)
+    42 // Always returns 42
+  })
+  q1.register(rt) // Register q1 for deep verify
+  // Query 2: depends on q1
+  let mut q2_count = 0
+  let q2 : Query[Int, Int] = db.query(fn(rt, key) {
+    q2_count = q2_count + 1
+    q1.fetch(rt, key) * 2
+  })
+  // Initial setup
+  input.set(rt, 0, 100) |> ignore
+  let r1 = q2.fetch(rt, 0)
+  inspect(r1, content="84")
+  inspect(q1_count, content="1")
+  inspect(q2_count, content="1")
+  // Change input - q1 will recompute but return same value (backdate)
+  input.set(rt, 0, 200) |> ignore
+  let r2 = q2.fetch(rt, 0)
+  inspect(r2, content="84") // Same result
+  inspect(q1_count, content="2") // q1 recomputed
+  inspect(q2_count, content="1") // q2 did NOT recompute (deep verify + backdate)
+}
+
+///|
+/// Deep Verify Test: Downstream recomputes when intermediate output changes
+test "Deep verify: downstream recomputes when intermediate changes" {
+  let db = Database::new()
+  let rt = db.runtime()
+  let input : Input[Int, Int] = db.input()
+  input.register(rt)
+  // Query 1: returns input * 2
+  let mut q1_count = 0
+  let q1 : Query[Int, Int] = db.query(fn(rt, key) {
+    q1_count = q1_count + 1
+    input.get(rt, key).unwrap_or(0) * 2
+  })
+  q1.register(rt)
+  // Query 2: depends on q1
+  let mut q2_count = 0
+  let q2 : Query[Int, Int] = db.query(fn(rt, key) {
+    q2_count = q2_count + 1
+    q1.fetch(rt, key) + 10
+  })
+  // Initial setup
+  input.set(rt, 0, 5) |> ignore
+  let r1 = q2.fetch(rt, 0)
+  inspect(r1, content="20") // 5 * 2 + 10
+  inspect(q1_count, content="1")
+  inspect(q2_count, content="1")
+  // Change input - both should recompute
+  input.set(rt, 0, 15) |> ignore
+  let r2 = q2.fetch(rt, 0)
+  inspect(r2, content="40") // 15 * 2 + 10
+  inspect(q1_count, content="2")
+  inspect(q2_count, content="2") // Also recomputed
+}
+
+///|
+/// Deep Verify Test: Three-level query chain
+test "Deep verify: three-level chain" {
+  let db = Database::new()
+  let rt = db.runtime()
+  let input : Input[Int, Int] = db.input()
+  input.register(rt)
+  let mut q1_count = 0
+  let q1 : Query[Int, Int] = db.query(fn(rt, key) {
+    q1_count = q1_count + 1
+    input.get(rt, key).unwrap_or(0).abs() // abs causes backdate for negative change
+  })
+  q1.register(rt)
+  let mut q2_count = 0
+  let q2 : Query[Int, Int] = db.query(fn(rt, key) {
+    q2_count = q2_count + 1
+    q1.fetch(rt, key) * 10
+  })
+  q2.register(rt)
+  let mut q3_count = 0
+  let q3 : Query[Int, Int] = db.query(fn(rt, key) {
+    q3_count = q3_count + 1
+    q2.fetch(rt, key) + 1
+  })
+  // Initial: input = 5
+  input.set(rt, 0, 5) |> ignore
+  let r1 = q3.fetch(rt, 0)
+  inspect(r1, content="51") // |5| * 10 + 1
+  inspect(q1_count, content="1")
+  inspect(q2_count, content="1")
+  inspect(q3_count, content="1")
+  // Change to -5: abs(5) == abs(-5), so q1 backdates
+  input.set(rt, 0, -5) |> ignore
+  let r2 = q3.fetch(rt, 0)
+  inspect(r2, content="51") // |(-5)| * 10 + 1 = same
+  inspect(q1_count, content="2") // q1 recomputed
+  inspect(q2_count, content="1") // q2 skipped (q1 backdated)
+  inspect(q3_count, content="1") // q3 skipped (q2 not changed)
+  // Change to 10: output changes
+  input.set(rt, 0, 10) |> ignore
+  let r3 = q3.fetch(rt, 0)
+  inspect(r3, content="101") // |10| * 10 + 1
+  inspect(q1_count, content="3")
+  inspect(q2_count, content="2")
+  inspect(q3_count, content="2")
+}
