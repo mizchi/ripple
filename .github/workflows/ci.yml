@@ -26,4 +26,4 @@ jobs:
       - name: Format check
         run: |
           ~/.moon/bin/moon fmt
-          git diff --exit-code
+          git --no-pager diff --no-ext-diff --exit-code
