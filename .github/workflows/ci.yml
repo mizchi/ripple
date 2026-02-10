@@ -24,4 +24,6 @@ jobs:
         run: ~/.moon/bin/moon test
 
       - name: Format check
-        run: ~/.moon/bin/moon fmt --check
+        run: |
+          ~/.moon/bin/moon fmt
+          git diff --exit-code
