@@ -1,0 +1,59 @@
+package mizchi:ripple@0.1.0;
+
+interface types {
+    variant value {
+        val-null,
+        val-bool(bool),
+        val-int(s32),
+        val-float(f64),
+        val-str(string),
+    }
+
+    enum durability {
+        low,
+        medium,
+        high,
+    }
+}
+
+interface query-handler {
+    use types.{value};
+    compute: func(query-id: u32, key: string) -> value;
+}
+
+interface ripple {
+    use types.{value, durability};
+
+    // -- Database --
+    create-database: func() -> u32;
+    current-revision: func(db: u32) -> s32;
+
+    // -- Input (string-keyed, value-typed) --
+    create-input: func(db: u32) -> u32;
+    create-input-with-durability: func(db: u32, dur: durability) -> u32;
+    input-set: func(db: u32, input-handle: u32, key: string, val: value) -> s32;
+    input-get: func(db: u32, input-handle: u32, key: string) -> option<value>;
+    input-contains: func(input-handle: u32, key: string) -> bool;
+
+    // -- Query (compute via imported query-handler) --
+    create-query: func(db: u32) -> u32;
+    query-fetch: func(db: u32, query-handle: u32, key: string) -> value;
+
+    // -- Intern --
+    create-intern: func(db: u32) -> u32;
+    create-intern-with-durability: func(db: u32, dur: durability) -> u32;
+    intern-value: func(db: u32, intern-handle: u32, val: value) -> s32;
+    intern-lookup: func(db: u32, intern-handle: u32, id: s32) -> option<value>;
+
+    // -- Accumulator --
+    create-accumulator: func(db: u32) -> u32;
+    accumulator-push: func(db: u32, acc-handle: u32, val: value);
+    accumulator-get-for-query: func(acc-handle: u32, query-handle: u32, key: string) -> list<value>;
+    accumulator-clear-all: func(acc-handle: u32);
+}
+
+world ripple-world {
+    import query-handler;
+    export types;
+    export ripple;
+}

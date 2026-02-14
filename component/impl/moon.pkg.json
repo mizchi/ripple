@@ -1,0 +1,33 @@
+{
+  "is-main": true,
+  "import": [
+    { "path": "ripple-component/gen/cabi", "alias": "cabi" },
+    { "path": "ripple-component/gen/interface/mizchi/ripple/query-handler", "alias": "query_handler" },
+    { "path": "mizchi/ripple", "alias": "ripple" }
+  ],
+  "link": {
+    "wasm": {
+      "exports": [
+        "cabi_realloc:cabi_realloc",
+        "wasmExportAccumulatorClearAll:mizchi:ripple/ripple@0.1.0#accumulator-clear-all",
+        "wasmExportAccumulatorGetForQuery:mizchi:ripple/ripple@0.1.0#accumulator-get-for-query",
+        "wasmExportAccumulatorPush:mizchi:ripple/ripple@0.1.0#accumulator-push",
+        "wasmExportCreateAccumulator:mizchi:ripple/ripple@0.1.0#create-accumulator",
+        "wasmExportCreateDatabase:mizchi:ripple/ripple@0.1.0#create-database",
+        "wasmExportCreateInput:mizchi:ripple/ripple@0.1.0#create-input",
+        "wasmExportCreateInputWithDurability:mizchi:ripple/ripple@0.1.0#create-input-with-durability",
+        "wasmExportCreateIntern:mizchi:ripple/ripple@0.1.0#create-intern",
+        "wasmExportCreateInternWithDurability:mizchi:ripple/ripple@0.1.0#create-intern-with-durability",
+        "wasmExportCreateQuery:mizchi:ripple/ripple@0.1.0#create-query",
+        "wasmExportCurrentRevision:mizchi:ripple/ripple@0.1.0#current-revision",
+        "wasmExportInputContains:mizchi:ripple/ripple@0.1.0#input-contains",
+        "wasmExportInputGet:mizchi:ripple/ripple@0.1.0#input-get",
+        "wasmExportInputSet:mizchi:ripple/ripple@0.1.0#input-set",
+        "wasmExportInternLookup:mizchi:ripple/ripple@0.1.0#intern-lookup",
+        "wasmExportInternValue:mizchi:ripple/ripple@0.1.0#intern-value",
+        "wasmExportQueryFetch:mizchi:ripple/ripple@0.1.0#query-fetch"
+      ],
+      "export-memory-name": "memory"
+    }
+  }
+}

@@ -1,0 +1,50 @@
+# ripple-component build pipeline
+
+moon_component := env("MOON_COMPONENT", "moon-component")
+wasm_build := "_build/wasm/release/build/impl/impl.wasm"
+
+default:
+    @just --list
+
+# Generate bindings from WIT
+generate:
+    cd {{justfile_directory()}} && {{moon_component}} wit --out-dir . --no-impl
+
+# Build wasm core module
+build:
+    cd {{justfile_directory()}} && moon build --target wasm --release
+
+# Patch WAT to fix FFI import signatures and create component
+componentize: build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{justfile_directory()}}
+    wasm-tools print {{wasm_build}} > impl.wat
+    # Patch import: remove (result i32) from retptr-style import
+    sed 's|(import "mizchi:ripple/query-handler@0.1.0" "compute" (func (;0;) (type 0)))|(import "mizchi:ripple/query-handler@0.1.0" "compute" (func (;0;) (param i32 i32 i32 i32)))|' impl.wat > impl_patched.wat
+    # Remove drop after call to patched import (find "call 0" and delete next line if it's "drop")
+    line=$(grep -n 'call 0$' impl_patched.wat | head -1 | cut -d: -f1)
+    next=$((line + 1))
+    if sed -n "${next}p" impl_patched.wat | grep -q 'drop'; then
+        sed -i '' "${next}d" impl_patched.wat
+    fi
+    wasm-tools parse impl_patched.wat -o impl_patched.wasm
+    wasm-tools component embed wit --world ripple-world impl_patched.wasm -o impl_embedded.wasm
+    wasm-tools component new impl_embedded.wasm -o ripple-component.wasm
+    echo "Created ripple-component.wasm"
+
+# Transpile component to JS for testing
+transpile: componentize
+    npx jco transpile ripple-component.wasm -o test/gen --map 'mizchi:ripple/query-handler=../handler.js'
+
+# Run E2E tests
+test: transpile
+    node test/test.mjs
+
+# Verify component WIT output
+wit:
+    wasm-tools component wit ripple-component.wasm
+
+# Clean build artifacts
+clean:
+    rm -rf _build impl.wat impl_patched.wat impl_patched.wasm impl_embedded.wasm test/gen
