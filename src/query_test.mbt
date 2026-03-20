@@ -108,3 +108,39 @@ test "Query::maybe_changed_after" {
   inspect(q.maybe_changed_after(5, Revision::zero()), content="true")
   inspect(q.maybe_changed_after(5, Revision::new(1)), content="false")
 }
+
+///|
+test "Query verifier only invalidates the touched key" {
+  let db = Database::new()
+  let rt = db.runtime()
+  let inputs : Input[String, Int] = db.input()
+  inputs.register(rt)
+  let mut call_count = 0
+  let parity : Query[String, Int] = db.query(fn(rt, key) {
+    call_count = call_count + 1
+    match inputs.get(rt, key) {
+      Some(value) => value % 2
+      None => 0
+    }
+  })
+  parity.register(rt)
+  let mut sum_count = 0
+  let sum : Query[String, Int] = db.query(fn(rt, _key) {
+    sum_count = sum_count + 1
+    parity.fetch(rt, "a") + parity.fetch(rt, "b")
+  })
+  sum.register(rt)
+  inputs.set(rt, "a", 1) |> ignore
+  inputs.set(rt, "b", 3) |> ignore
+  inspect(sum.fetch(rt, "sum"), content="2")
+  inspect(call_count, content="2")
+  inspect(sum_count, content="1")
+  let changed_1 = sum.changed_at("sum").unwrap().get()
+  inspect(changed_1, content="3")
+  inputs.set(rt, "b", 5) |> ignore
+  inspect(sum.fetch(rt, "sum"), content="2")
+  inspect(call_count, content="3")
+  inspect(sum_count, content="1")
+  let changed_2 = sum.changed_at("sum").unwrap().get()
+  inspect(changed_2, content="3")
+}
