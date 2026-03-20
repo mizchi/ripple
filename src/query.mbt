@@ -48,21 +48,17 @@ pub fn[K : Hash + Eq, V : Eq] Query::register(
   self : Query[K, V],
   rt : Runtime,
 ) -> Unit {
-  // Create verifier that properly updates the memo before checking
-  // We need to capture self and rt to call verify_internal
   let query = self
   let runtime = rt
   rt.register_verifier(self.ingredient_index, fn(key_index, revision) {
-    // First, ensure the memo is up to date by calling verify_internal
     query.verify_by_hash(runtime, key_index)
-    // Then check if it changed
     for entry in query.memos.iter() {
-      let (_, memo) = entry
-      if memo.changed_at.is_after(revision) {
-        return true
+      let (key, memo) = entry
+      if key.hash() == key_index {
+        return memo.changed_at.is_after(revision)
       }
     }
-    false
+    true
   })
 }
 

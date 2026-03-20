@@ -1,0 +1,8 @@
+{
+  "name": "ripple-component",
+  "version": "0.1.0",
+  "deps": {
+    "mizchi/ripple": { "path": ".." }
+  },
+  "source": "."
+}

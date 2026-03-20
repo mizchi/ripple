@@ -1,0 +1,5 @@
+{
+  "import": [
+    { "path": "ripple-component/gen/cabi", "alias": "cabi" }
+  ]
+}
