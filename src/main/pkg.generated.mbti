@@ -1,31 +1,25 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "mizchi/ripple/main"
 
+import {
+  "moonbitlang/core/debug",
+}
+
 // Values
 pub fn run_typelang_demo() -> Unit
 
 // Errors
 
 // Types and methods
-type CompiledObject
-pub impl Eq for CompiledObject
-pub impl Show for CompiledObject
+type CompiledObject derive(Eq, @debug.Debug)
 
-type Diagnostic
-pub impl Eq for Diagnostic
-pub impl Show for Diagnostic
+type Diagnostic derive(Eq, @debug.Debug)
 
-type Expr
-pub impl Eq for Expr
-pub impl Show for Expr
+type Expr derive(Eq, @debug.Debug)
 
-type FileContent
-pub impl Eq for FileContent
-pub impl Hash for FileContent
-pub impl Show for FileContent
+type FileContent derive(Eq, Hash, @debug.Debug)
 
-type Ty
-pub impl Eq for Ty
+type Ty derive(Eq, @debug.Debug)
 pub impl Show for Ty
 
 type TyEnv

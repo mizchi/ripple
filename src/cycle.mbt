@@ -23,6 +23,9 @@ pub struct CycleQuery[K, V] {
   compute : (Runtime, K) -> V
   /// Cached results
   memos : @hashmap.HashMap[K, CycleMemo[V]]
+  /// Reverse index: key hash -> key, so the verifier (which only receives a
+  /// hash) can resolve the key in O(1) instead of scanning every memo.
+  hash_to_key : @hashmap.HashMap[Int, K]
   /// Cycle recovery strategy
   strategy : CycleStrategy[K, V]
 }
@@ -48,7 +51,8 @@ pub fn[K, V] CycleQuery::new(
   {
     ingredient_index,
     compute,
-    memos: @hashmap.new(),
+    memos: @hashmap.HashMap::default(),
+    hash_to_key: @hashmap.HashMap::default(),
     strategy: CycleStrategy::Panic,
   }
 }
@@ -63,7 +67,8 @@ pub fn[K, V] CycleQuery::new_with_fallback(
   {
     ingredient_index,
     compute,
-    memos: @hashmap.new(),
+    memos: @hashmap.HashMap::default(),
+    hash_to_key: @hashmap.HashMap::default(),
     strategy: CycleStrategy::Fallback(fallback),
   }
 }
@@ -78,7 +83,8 @@ pub fn[K, V] CycleQuery::new_with_recover(
   {
     ingredient_index,
     compute,
-    memos: @hashmap.new(),
+    memos: @hashmap.HashMap::default(),
+    hash_to_key: @hashmap.HashMap::default(),
     strategy: CycleStrategy::Recover(recover),
   }
 }
@@ -124,7 +130,7 @@ pub fn[K : Hash + Eq, V : Eq] CycleQuery::fetch(
       }
       // Durability-based shallow verify
       let last_changed = rt.last_changed_at(memo.durability)
-      if not(last_changed.is_after(memo.verified_at)) {
+      if !last_changed.is_after(memo.verified_at) {
         memo.verified_at = rt.current_revision()
         if rt.has_active_query() {
           rt.record_dependency(
@@ -139,7 +145,7 @@ pub fn[K : Hash + Eq, V : Eq] CycleQuery::fetch(
       }
       // Deep verify
       let deps_changed = self.deep_verify(rt, memo)
-      if not(deps_changed) {
+      if !deps_changed {
         memo.verified_at = rt.current_revision()
         if rt.has_active_query() {
           rt.record_dependency(
@@ -222,6 +228,8 @@ fn[K : Hash + Eq, V : Eq] CycleQuery::execute_with_fixpoint(
   key : K,
   key_hash : Int,
 ) -> V {
+  // Record the hash -> key mapping so the verifier can resolve this key in O(1).
+  self.hash_to_key.set(key_hash, key)
   // First execution
   rt.push_query(self.ingredient_index, key_hash)
   let value = (self.compute)(rt, key)
@@ -357,14 +365,16 @@ pub fn[K : Hash + Eq, V : Eq] CycleQuery::register(
   rt.register_verifier(self.ingredient_index, fn(key_index, revision) {
     // First ensure the memo is up to date
     query.verify_by_hash(runtime, key_index)
-    // Then check if the specific key's memo changed after the revision
-    for entry in query.memos.iter() {
-      let (key, memo) = entry
-      if key.hash() == key_index {
-        return memo.changed_at.is_after(revision)
-      }
+    // Then check if the specific key's memo changed after the revision.
+    // Resolve the key via the reverse index (O(1)) instead of scanning memos.
+    match query.hash_to_key.get(key_index) {
+      Some(key) =>
+        match query.memos.get(key) {
+          Some(memo) => memo.changed_at.is_after(revision)
+          None => true
+        }
+      None => true // No memo found, consider it changed
     }
-    true // No memo found, consider it changed
   })
 }
 
@@ -380,29 +390,32 @@ fn[K : Hash + Eq, V : Eq] CycleQuery::verify_by_hash(
   if rt.is_executing(self.ingredient_index, key_hash) {
     return // Already being verified, skip
   }
-  for entry in self.memos.iter() {
-    let (key, memo) = entry
-    if key.hash() == key_hash {
-      if memo.verified_at == rt.current_revision() {
-        return
-      }
-      let last_changed = rt.last_changed_at(memo.durability)
-      if not(last_changed.is_after(memo.verified_at)) {
-        memo.verified_at = rt.current_revision()
-        return
-      }
-      // Use query stack for cycle detection during deep verify
-      rt.push_query(self.ingredient_index, key_hash)
-      let deps_changed = self.deep_verify(rt, memo)
-      rt.pop_query() |> ignore
-      if not(deps_changed) {
-        memo.verified_at = rt.current_revision()
-        return
-      }
-      self.execute_with_fixpoint(rt, key, key_hash) |> ignore
-      return
-    }
+  // Resolve the key from its hash via the reverse index (O(1)).
+  let key = match self.hash_to_key.get(key_hash) {
+    Some(key) => key
+    None => return
   }
+  let memo = match self.memos.get(key) {
+    Some(memo) => memo
+    None => return
+  }
+  if memo.verified_at == rt.current_revision() {
+    return
+  }
+  let last_changed = rt.last_changed_at(memo.durability)
+  if !last_changed.is_after(memo.verified_at) {
+    memo.verified_at = rt.current_revision()
+    return
+  }
+  // Use query stack for cycle detection during deep verify
+  rt.push_query(self.ingredient_index, key_hash)
+  let deps_changed = self.deep_verify(rt, memo)
+  rt.pop_query() |> ignore
+  if !deps_changed {
+    memo.verified_at = rt.current_revision()
+    return
+  }
+  self.execute_with_fixpoint(rt, key, key_hash) |> ignore
 }
 
 ///|

@@ -51,8 +51,8 @@ test "Query inherits minimum durability from dependencies" {
   high_query.fetch(rt, 0) |> ignore
   mixed_query.fetch(rt, 0) |> ignore
   // Check durabilities
-  inspect(high_query.get_durability(0), content="Some(High)")
-  inspect(mixed_query.get_durability(0), content="Some(Low)")
+  debug_inspect(high_query.get_durability(0), content="Some(High)")
+  debug_inspect(mixed_query.get_durability(0), content="Some(Low)")
 }
 
 ///|

@@ -9,7 +9,20 @@ pub(all) enum Durability {
   Medium
   /// High durability - rarely changes (e.g., standard library)
   High
-} derive(Eq, Compare, Show, Hash)
+} derive(Eq, Compare, Hash, Debug)
+
+///|
+/// Show prints the variant name (e.g. "Low"), preserving the previous
+/// derived-Show output.
+pub impl Show for Durability with fn output(self, logger) {
+  logger.write_string(
+    match self {
+      Low => "Low"
+      Medium => "Medium"
+      High => "High"
+    },
+  )
+}
 
 ///|
 /// Number of durability levels (for array indexing).

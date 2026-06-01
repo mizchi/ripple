@@ -1,7 +1,15 @@
 ///|
 /// InternId is a lightweight identifier for interned values.
 /// Same value always gets the same ID, enabling O(1) comparison.
-pub(all) struct InternId(Int) derive(Eq, Compare, Hash, Show)
+pub(all) struct InternId(Int) derive(Eq, Compare, Hash, Debug)
+
+///|
+/// Show prints "InternId(<n>)", preserving the previous derived-Show output.
+pub impl Show for InternId with fn output(self, logger) {
+  logger.write_string("InternId(")
+  logger.write_string(self.0.to_string())
+  logger.write_string(")")
+}
 
 ///|
 /// Get the raw integer value of the InternId.
@@ -41,7 +49,7 @@ pub fn[V] Intern::new(ingredient_index : Int) -> Intern[V] {
   {
     ingredient_index,
     durability: Durability::High,
-    value_to_id: @hashmap.new(),
+    value_to_id: @hashmap.HashMap::default(),
     id_to_value: [],
     changed_at: Revision::zero(),
   }
@@ -56,7 +64,7 @@ pub fn[V] Intern::new_with_durability(
   {
     ingredient_index,
     durability,
-    value_to_id: @hashmap.new(),
+    value_to_id: @hashmap.HashMap::default(),
     id_to_value: [],
     changed_at: Revision::zero(),
   }

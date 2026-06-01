@@ -10,7 +10,22 @@ pub struct QueryEdge {
   changed_at : Revision
   /// Durability of the dependency
   durability : Durability
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+/// Show prints the edge's fields, preserving a readable representation
+/// equivalent to the previous derived Show.
+pub impl Show for QueryEdge with fn output(self, logger) {
+  logger.write_string("QueryEdge(ingredient_index=")
+  logger.write_string(self.ingredient_index.to_string())
+  logger.write_string(", key_index=")
+  logger.write_string(self.key_index.to_string())
+  logger.write_string(", changed_at=")
+  Show::output(self.changed_at, logger)
+  logger.write_string(", durability=")
+  Show::output(self.durability, logger)
+  logger.write_string(")")
+}
 
 ///|
 /// ActiveQuery represents a query that is currently being executed.
@@ -97,7 +112,7 @@ pub fn Runtime::new() -> Runtime {
     current_revision: Revision::new(1),
     query_stack: [],
     durability_revisions: [Revision::zero(), Revision::zero(), Revision::zero()],
-    verifiers: @hashmap.new(),
+    verifiers: @hashmap.HashMap::default(),
   }
 }
 
@@ -200,7 +215,7 @@ pub fn Runtime::record_dependency(
 ///|
 /// Check if there is an active query on the stack.
 pub fn Runtime::has_active_query(self : Runtime) -> Bool {
-  not(self.query_stack.is_empty())
+  !self.query_stack.is_empty()
 }
 
 ///|

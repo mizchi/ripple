@@ -144,13 +144,13 @@ test "CycleQuery: changed_at and get_durability" {
     input.get(rt, key).unwrap_or(0)
   })
   // Before computation
-  inspect(query.changed_at(0), content="None")
-  inspect(query.get_durability(0), content="None")
+  debug_inspect(query.changed_at(0), content="None")
+  debug_inspect(query.get_durability(0), content="None")
   // After computation
   input.set(rt, 0, 42) |> ignore
   query.fetch(rt, 0) |> ignore
-  inspect(not(query.changed_at(0) is None), content="true")
-  inspect(query.get_durability(0), content="Some(Low)")
+  inspect(!(query.changed_at(0) is None), content="true")
+  debug_inspect(query.get_durability(0), content="Some(Low)")
 }
 
 ///|

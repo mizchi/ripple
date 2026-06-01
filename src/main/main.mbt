@@ -15,7 +15,7 @@ struct FileContent {
   path : String
   content : String
   mtime : Int // Modification time (simulated)
-} derive(Eq, Hash, Show)
+} derive(Eq, Hash, Debug)
 
 ///|
 /// Compiled object (simplified)
@@ -23,7 +23,7 @@ struct CompiledObject {
   path : String
   code : String // "compiled" output
   deps : Array[String] // Dependencies
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Build diagnostic
@@ -31,7 +31,7 @@ struct Diagnostic {
   level : String // "error", "warning", "info"
   file : String
   message : String
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Parse imports from file content
@@ -41,7 +41,7 @@ fn parse_imports(content : String) -> Array[String] {
   let lines = content.split("\n")
   for line in lines {
     let trimmed = line.trim()
-    let trimmed_str = trimmed.to_string()
+    let trimmed_str = trimmed.to_owned()
     if trimmed_str.has_prefix("import ") {
       // Get the part after "import "
       let chars = trimmed_str.to_array()
@@ -49,7 +49,7 @@ fn parse_imports(content : String) -> Array[String] {
       let rest = String::from_array(rest_chars)
       let parts = rest.split(",")
       for part in parts {
-        let name = part.trim().to_string()
+        let name = part.trim().to_owned()
         if name.length() > 0 {
           imports.push(name)
         }
@@ -67,9 +67,9 @@ fn compile_content(path : String, content : String) -> String {
   let output : Array[String] = []
   output.push("// Compiled: " + path)
   for line in lines {
-    let trimmed = line.trim().to_string()
-    if not(trimmed.has_prefix("import ")) {
-      output.push(line.to_string())
+    let trimmed = line.trim().to_owned()
+    if !trimmed.has_prefix("import ") {
+      output.push(line.to_owned())
     }
   }
   output.join("\n")
@@ -154,7 +154,7 @@ fn main {
         let query = all_deps_ref.val.unwrap()
         let transitive = query.fetch(rt, dep)
         for t in transitive {
-          if not(result.contains(t)) {
+          if !result.contains(t) {
             result.push(t)
           }
         }

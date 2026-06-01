@@ -34,9 +34,9 @@ test {
   files.set(rt, "lib.mbt", "fn helper { }") |> ignore
 
   // 値の取得
-  inspect(files.get(rt, "main.mbt"), content="Some(\"fn main { }\")")
-  inspect(files.get(rt, "lib.mbt"), content="Some(\"fn helper { }\")")
-  inspect(files.get(rt, "unknown"), content="None")
+  debug_inspect(files.get(rt, "main.mbt"), content="Some(\"fn main { }\")")
+  debug_inspect(files.get(rt, "lib.mbt"), content="Some(\"fn helper { }\")")
+  debug_inspect(files.get(rt, "unknown"), content="None")
 }
 ```
 
@@ -167,8 +167,8 @@ test {
   inspect(id1 == id2, content="false") // 違う値 → 違う ID
 
   // ID から値を逆引き
-  inspect(strings.lookup(rt, id1), content="Some(\"hello\")")
-  inspect(strings.lookup(rt, id2), content="Some(\"world\")")
+  debug_inspect(strings.lookup(rt, id1), content="Some(\"hello\")")
+  debug_inspect(strings.lookup(rt, id2), content="Some(\"world\")")
 }
 ```
 
@@ -272,8 +272,8 @@ test {
   sources.set(rt, "b", "import a\nfn helper_b {}") |> ignore
 
   // 依存関係を解析
-  inspect(parse_imports.fetch(rt, "main"), content="[\"a\", \"b\"]")
-  inspect(parse_imports.fetch(rt, "b"), content="[\"a\"]")
-  inspect(parse_imports.fetch(rt, "a"), content="[]")
+  debug_inspect(parse_imports.fetch(rt, "main"), content="[\"a\", \"b\"]")
+  debug_inspect(parse_imports.fetch(rt, "b"), content="[\"a\"]")
+  debug_inspect(parse_imports.fetch(rt, "a"), content="[]")
 }
 ```
