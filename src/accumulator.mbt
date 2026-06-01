@@ -19,7 +19,7 @@ pub struct Accumulator[V] {
 ///|
 /// Create a new Accumulator with the given ingredient index.
 pub fn[V] Accumulator::new(ingredient_index : Int) -> Accumulator[V] {
-  { ingredient_index, values: @hashmap.new() }
+  { ingredient_index, values: @hashmap.HashMap::default() }
 }
 
 ///|
@@ -129,7 +129,7 @@ pub fn[V] Accumulator::has_values(
   key_hash : Int,
 ) -> Bool {
   match self.values.get((query_index, key_hash)) {
-    Some(arr) => not(arr.is_empty())
+    Some(arr) => !arr.is_empty()
     None => false
   }
 }

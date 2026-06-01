@@ -27,10 +27,10 @@ test "Intern: basic intern and lookup" {
   inspect(id1.get(), content="0")
   inspect(id2.get(), content="1")
   // Lookup by ID
-  inspect(strings.lookup(rt, id1), content="Some(\"hello\")")
-  inspect(strings.lookup(rt, id2), content="Some(\"world\")")
+  debug_inspect(strings.lookup(rt, id1), content="Some(\"hello\")")
+  debug_inspect(strings.lookup(rt, id2), content="Some(\"world\")")
   // Invalid ID returns None
-  inspect(strings.lookup(rt, @ripple.InternId(99)), content="None")
+  debug_inspect(strings.lookup(rt, @ripple.InternId(99)), content="None")
 }
 
 ///|
@@ -40,11 +40,11 @@ test "Intern: contains and get_id" {
   let strings : @ripple.Intern[String] = @ripple.Intern::new(0)
   // Initially empty
   inspect(strings.contains("hello"), content="false")
-  inspect(strings.get_id("hello"), content="None")
+  debug_inspect(strings.get_id("hello"), content="None")
   // After interning
   let id = strings.intern(rt, "hello")
   inspect(strings.contains("hello"), content="true")
-  inspect(strings.get_id("hello"), content="Some(InternId(0))")
+  debug_inspect(strings.get_id("hello"), content="Some(InternId(0))")
   inspect(strings.get_id("hello").unwrap() == id, content="true")
 }
 
@@ -111,7 +111,7 @@ test "Intern: integer keys" {
   let id3 = numbers.intern(rt, 42)
   inspect(id1 == id3, content="true")
   inspect(id1 == id2, content="false")
-  inspect(numbers.lookup(rt, id1), content="Some(42)")
+  debug_inspect(numbers.lookup(rt, id1), content="Some(42)")
 }
 
 ///|
@@ -125,5 +125,5 @@ test "Intern: tuple keys (for composite symbols)" {
   let id3 = qualified.intern(rt, ("std", "print"))
   inspect(id1 == id3, content="true")
   inspect(id1 == id2, content="false")
-  inspect(qualified.lookup(rt, id1), content="Some((\"std\", \"print\"))")
+  debug_inspect(qualified.lookup(rt, id1), content="Some((\"std\", \"print\"))")
 }

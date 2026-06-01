@@ -97,6 +97,42 @@ test "Query records dependencies" {
 }
 
 ///|
+/// Regression: the verifier must check only the requested key's memo, not
+/// report "changed" because some *other* key in the same query changed.
+/// (Previously the verifier scanned all memos and returned true if any changed.)
+test "Query verifier isolates keys across a dependent query" {
+  let rt = Runtime::new()
+  let input : Input[String, Int] = Input::new(0)
+  input.set(rt, "a", 1) |> ignore
+  input.set(rt, "b", 1) |> ignore
+  // Inner query: B(key) reads the input named `key`.
+  let b : Query[String, Int] = Query::new(1, fn(rt, key) {
+    input.get(rt, key).unwrap_or(0) * 10
+  })
+  b.register(rt)
+  // Outer query: A depends only on B("a").
+  let mut a_calls = 0
+  let a : Query[String, Int] = Query::new(2, fn(rt, _key) {
+    a_calls = a_calls + 1
+    b.fetch(rt, "a")
+  })
+  // Populate both inner keys and compute A once.
+  inspect(b.fetch(rt, "b"), content="10")
+  inspect(a.fetch(rt, "top"), content="10")
+  inspect(a_calls, content="1")
+  // Change input "b" and recompute B("b") so its changed_at advances.
+  // A depends on B("a") only, so A must NOT recompute despite B("b") changing.
+  input.set(rt, "b", 99) |> ignore
+  inspect(b.fetch(rt, "b"), content="990")
+  inspect(a.fetch(rt, "top"), content="10")
+  inspect(a_calls, content="1") // still 1: B("b")'s change must not invalidate A
+  // Now change input "a" — A must recompute.
+  input.set(rt, "a", 2) |> ignore
+  inspect(a.fetch(rt, "top"), content="20")
+  inspect(a_calls, content="2")
+}
+
+///|
 test "Query::maybe_changed_after" {
   let rt = Runtime::new()
   let q : Query[Int, Int] = Query::new(0, fn(_rt, x) { x * 2 })

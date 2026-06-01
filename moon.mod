@@ -1,0 +1,19 @@
+name = "mizchi/ripple"
+
+version = "0.1.4"
+
+preferred_target = "js"
+
+readme = "README.mbt.md"
+
+repository = "https://github.com/mizchi/ripple"
+
+license = "MIT"
+
+keywords = [ "incremental", "memoization", "cache", "dependency-tracking" ]
+
+description = "Incremental computation library for MoonBit - changes ripple through the dependency graph"
+
+options(
+  source: "src",
+)

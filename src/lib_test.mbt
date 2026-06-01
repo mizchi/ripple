@@ -11,7 +11,7 @@
 fn parse_imports(content : String) -> Array[String] {
   let parts : Array[String] = []
   // Check if content starts with "import "
-  if not(content.has_prefix("import ")) {
+  if !content.has_prefix("import ") {
     return parts
   }
   // Extract the part after "import "

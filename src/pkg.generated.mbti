@@ -2,6 +2,7 @@
 package "mizchi/ripple"
 
 import {
+  "moonbitlang/core/debug",
   "moonbitlang/core/hashmap",
 }
 
@@ -43,6 +44,7 @@ pub struct CycleQuery[K, V] {
   ingredient_index : Int
   compute : (Runtime, K) -> V
   memos : @hashmap.HashMap[K, CycleMemo[V]]
+  hash_to_key : @hashmap.HashMap[Int, K]
   strategy : CycleStrategy[K, V]
 }
 pub fn[K : Hash + Eq, V] CycleQuery::changed_at(Self[K, V], K) -> Revision?
@@ -82,12 +84,9 @@ pub(all) enum Durability {
   Low
   Medium
   High
-}
+} derive(Compare, Eq, Hash, @debug.Debug)
 pub fn Durability::min(Self, Self) -> Self
 pub fn Durability::to_index(Self) -> Int
-pub impl Compare for Durability
-pub impl Eq for Durability
-pub impl Hash for Durability
 pub impl Show for Durability
 
 pub struct Input[K, V] {
@@ -128,14 +127,9 @@ pub fn[V] Intern::new(Int) -> Self[V]
 pub fn[V] Intern::new_with_durability(Int, Durability) -> Self[V]
 pub fn[V] Intern::register(Self[V], Runtime) -> Unit
 
-pub(all) struct InternId(Int)
+pub(all) struct InternId(Int) derive(Compare, Eq, Hash, @debug.Debug)
 pub fn InternId::from_raw(Int) -> Self
 pub fn InternId::get(Self) -> Int
-#deprecated
-pub fn InternId::inner(Self) -> Int
-pub impl Compare for InternId
-pub impl Eq for InternId
-pub impl Hash for InternId
 pub impl Show for InternId
 
 type Memo[V]
@@ -144,6 +138,7 @@ pub struct Query[K, V] {
   ingredient_index : Int
   compute : (Runtime, K) -> V
   memos : @hashmap.HashMap[K, Memo[V]]
+  hash_to_key : @hashmap.HashMap[Int, K]
 }
 pub fn[K : Hash + Eq, V] Query::changed_at(Self[K, V], K) -> Revision?
 pub fn[K : Hash + Eq, V : Eq] Query::fetch(Self[K, V], Runtime, K) -> V
@@ -158,23 +153,17 @@ pub struct QueryEdge {
   key_index : Int
   changed_at : Revision
   durability : Durability
-}
-pub impl Eq for QueryEdge
+} derive(Eq, @debug.Debug)
 pub impl Show for QueryEdge
 
-pub struct Revision(Int)
+pub struct Revision(Int) derive(Compare, Eq, Hash, @debug.Debug)
 pub fn Revision::get(Self) -> Int
-#deprecated
-pub fn Revision::inner(Self) -> Int
 pub fn Revision::is_after(Self, Self) -> Bool
 pub fn Revision::is_at_or_after(Self, Self) -> Bool
 pub fn Revision::max(Self, Self) -> Self
 pub fn Revision::new(Int) -> Self
 pub fn Revision::next(Self) -> Self
 pub fn Revision::zero() -> Self
-pub impl Compare for Revision
-pub impl Eq for Revision
-pub impl Hash for Revision
 pub impl Show for Revision
 
 type Runtime

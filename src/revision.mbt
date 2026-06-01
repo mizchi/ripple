@@ -3,7 +3,15 @@
 /// Each time an input changes, the revision is incremented.
 /// This is the core mechanism for tracking changes in the incremental computation system.
 /// Using newtype struct for zero-cost abstraction.
-pub struct Revision(Int) derive(Eq, Compare, Show, Hash)
+pub struct Revision(Int) derive(Eq, Compare, Hash, Debug)
+
+///|
+/// Show prints "Revision(<n>)", preserving the previous derived-Show output.
+pub impl Show for Revision with fn output(self, logger) {
+  logger.write_string("Revision(")
+  logger.write_string(self.0.to_string())
+  logger.write_string(")")
+}
 
 ///|
 /// Create a new Revision with value 0 (initial state).

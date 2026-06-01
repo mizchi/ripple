@@ -16,7 +16,26 @@ enum Ty {
   TBool
   TFun(Ty, Ty)
   TError(String)
-} derive(Eq, Show)
+} derive(Eq, Debug)
+
+///|
+/// Human-readable rendering of a type, used by the demo output.
+pub impl Show for Ty with fn output(self, logger) {
+  match self {
+    TInt => logger.write_string("Int")
+    TBool => logger.write_string("Bool")
+    TFun(arg, ret) => {
+      Show::output(arg, logger)
+      logger.write_string(" -> ")
+      Show::output(ret, logger)
+    }
+    TError(msg) => {
+      logger.write_string("Error(")
+      logger.write_string(msg)
+      logger.write_string(")")
+    }
+  }
+}
 
 ///|
 /// Expressions (simplified AST)
@@ -28,7 +47,7 @@ enum Expr {
   EFn(String, Ty, Expr)
   EApp(Expr, Expr)
   EIf(Expr, Expr, Expr)
-} derive(Eq, Show)
+} derive(Eq, Debug)
 
 ///|
 /// Type environment
@@ -38,12 +57,12 @@ struct TyEnv {
 
 ///|
 fn TyEnv::new() -> TyEnv {
-  { bindings: @hashmap.new() }
+  { bindings: @hashmap.HashMap::default() }
 }
 
 ///|
 fn TyEnv::extend(self : TyEnv, name : String, ty : Ty) -> TyEnv {
-  let new_bindings : @hashmap.HashMap[String, Ty] = @hashmap.new()
+  let new_bindings : @hashmap.HashMap[String, Ty] = @hashmap.HashMap::default()
   for entry in self.bindings.iter() {
     let (k, v) = entry
     new_bindings.set(k, v)
@@ -152,13 +171,13 @@ fn tokenize(input : String) -> Array[String] {
   let current : Array[Char] = []
   for c in input {
     if c == '(' || c == ')' {
-      if not(current.is_empty()) {
+      if !current.is_empty() {
         tokens.push(String::from_array(current))
         current.clear()
       }
       tokens.push(c.to_string())
     } else if c == ' ' || c == '\n' || c == '\t' {
-      if not(current.is_empty()) {
+      if !current.is_empty() {
         tokens.push(String::from_array(current))
         current.clear()
       }
@@ -166,7 +185,7 @@ fn tokenize(input : String) -> Array[String] {
       current.push(c)
     }
   }
-  if not(current.is_empty()) {
+  if !current.is_empty() {
     tokens.push(String::from_array(current))
   }
   tokens

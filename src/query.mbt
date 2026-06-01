@@ -22,6 +22,9 @@ pub struct Query[K, V] {
   compute : (Runtime, K) -> V
   /// Cached results
   memos : @hashmap.HashMap[K, Memo[V]]
+  /// Reverse index: key hash -> key, so the verifier (which only receives a
+  /// hash) can resolve the key in O(1) instead of scanning every memo.
+  hash_to_key : @hashmap.HashMap[Int, K]
 }
 
 ///|
@@ -30,7 +33,12 @@ pub fn[K, V] Query::new(
   ingredient_index : Int,
   compute : (Runtime, K) -> V,
 ) -> Query[K, V] {
-  { ingredient_index, compute, memos: @hashmap.new() }
+  {
+    ingredient_index,
+    compute,
+    memos: @hashmap.HashMap::default(),
+    hash_to_key: @hashmap.HashMap::default(),
+  }
 }
 
 ///|
@@ -55,14 +63,16 @@ pub fn[K : Hash + Eq, V : Eq] Query::register(
   rt.register_verifier(self.ingredient_index, fn(key_index, revision) {
     // First, ensure the memo is up to date by calling verify_internal
     query.verify_by_hash(runtime, key_index)
-    // Then check if it changed
-    for entry in query.memos.iter() {
-      let (_, memo) = entry
-      if memo.changed_at.is_after(revision) {
-        return true
-      }
+    // Then check if *this* key's memo changed after the given revision.
+    // Resolve the key via the reverse index (O(1)) instead of scanning memos.
+    match query.hash_to_key.get(key_index) {
+      Some(key) =>
+        match query.memos.get(key) {
+          Some(memo) => memo.changed_at.is_after(revision)
+          None => true
+        }
+      None => true
     }
-    false
   })
 }
 
@@ -74,31 +84,33 @@ fn[K : Hash + Eq, V : Eq] Query::verify_by_hash(
   rt : Runtime,
   key_hash : Int,
 ) -> Unit {
-  // Find the key with matching hash
-  for entry in self.memos.iter() {
-    let (key, memo) = entry
-    if key.hash() == key_hash {
-      // Verify this memo if needed
-      if memo.verified_at == rt.current_revision() {
-        return // Already verified
-      }
-      // Check durability-based shallow verify
-      let last_changed = rt.last_changed_at(memo.durability)
-      if not(last_changed.is_after(memo.verified_at)) {
-        memo.verified_at = rt.current_revision()
-        return // No changes at this durability level
-      }
-      // Deep verify: check dependencies
-      let deps_changed = self.deep_verify(rt, memo)
-      if not(deps_changed) {
-        memo.verified_at = rt.current_revision()
-        return // Dependencies unchanged
-      }
-      // Need to recompute - call execute
-      self.execute(rt, key, key_hash) |> ignore
-      return
-    }
+  // Resolve the key from its hash via the reverse index (O(1)).
+  let key = match self.hash_to_key.get(key_hash) {
+    Some(key) => key
+    None => return
   }
+  let memo = match self.memos.get(key) {
+    Some(memo) => memo
+    None => return
+  }
+  // Verify this memo if needed
+  if memo.verified_at == rt.current_revision() {
+    return // Already verified
+  }
+  // Check durability-based shallow verify
+  let last_changed = rt.last_changed_at(memo.durability)
+  if !last_changed.is_after(memo.verified_at) {
+    memo.verified_at = rt.current_revision()
+    return // No changes at this durability level
+  }
+  // Deep verify: check dependencies
+  let deps_changed = self.deep_verify(rt, memo)
+  if !deps_changed {
+    memo.verified_at = rt.current_revision()
+    return // Dependencies unchanged
+  }
+  // Need to recompute - call execute
+  self.execute(rt, key, key_hash) |> ignore
 }
 
 ///|
@@ -135,7 +147,7 @@ pub fn[K : Hash + Eq, V : Eq] Query::fetch(
       // If only high-durability inputs changed since last verify,
       // and this query only depends on higher durability, skip deep verify
       let last_changed = rt.last_changed_at(memo.durability)
-      if not(last_changed.is_after(memo.verified_at)) {
+      if !last_changed.is_after(memo.verified_at) {
         // No changes at this durability level - cache is valid
         memo.verified_at = rt.current_revision()
         if rt.has_active_query() {
@@ -151,7 +163,7 @@ pub fn[K : Hash + Eq, V : Eq] Query::fetch(
       }
       // Deep verify: check if any dependency actually changed
       let deps_changed = self.deep_verify(rt, memo)
-      if not(deps_changed) {
+      if !deps_changed {
         // No dependency changed - cache is still valid
         memo.verified_at = rt.current_revision()
         if rt.has_active_query() {
@@ -255,6 +267,7 @@ fn[K : Hash + Eq, V : Eq] Query::execute(
     edges,
   }
   self.memos.set(key, memo)
+  self.hash_to_key.set(key_hash, key)
   value
 }
 

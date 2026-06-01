@@ -25,8 +25,8 @@ pub fn[K, V] Input::new(ingredient_index : Int) -> Input[K, V] {
   {
     ingredient_index,
     durability: Durability::Low,
-    values: @hashmap.new(),
-    hash_to_changed_at: @hashmap.new(),
+    values: @hashmap.HashMap::default(),
+    hash_to_changed_at: @hashmap.HashMap::default(),
   }
 }
 
@@ -39,8 +39,8 @@ pub fn[K, V] Input::new_with_durability(
   {
     ingredient_index,
     durability,
-    values: @hashmap.new(),
-    hash_to_changed_at: @hashmap.new(),
+    values: @hashmap.HashMap::default(),
+    hash_to_changed_at: @hashmap.HashMap::default(),
   }
 }
 
